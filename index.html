@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flappy Zoe</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(180deg, #8fd9ff 0%, #dff6ff 100%);
+      color: #163b59;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+    }
+
+    .app {
+      width: min(1180px, 100%);
+      height: min(760px, calc(100vh - 24px));
+      display: grid;
+      grid-template-columns: minmax(280px, 440px) minmax(260px, 360px);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .game-card,
+    .side-card {
+      background: rgba(255, 255, 255, 0.42);
+      border: 2px solid rgba(255, 255, 255, 0.75);
+      border-radius: 28px;
+      box-shadow: 0 18px 40px rgba(15, 61, 95, 0.16);
+      backdrop-filter: blur(8px);
+    }
+
+    .game-card {
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      max-width: 430px;
+      max-height: 100%;
+      aspect-ratio: 430 / 680;
+      border-radius: 22px;
+      overflow: hidden;
+      border: 3px solid rgba(255, 255, 255, 0.85);
+      box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.08);
+      background: linear-gradient(180deg, #7fd4ff 0%, #e8fbff 100%);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+      background: linear-gradient(180deg, #7fd4ff 0%, #e8fbff 100%);
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(12, 45, 71, 0.20);
+      z-index: 5;
+      transition: 0.25s ease;
+      padding: 22px;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .overlay-panel {
+      width: 100%;
+      max-width: 310px;
+      background: rgba(255, 255, 255, 0.92);
+      border-radius: 24px;
+      padding: 22px 20px;
+      text-align: center;
+      box-shadow: 0 16px 34px rgba(15, 61, 95, 0.20);
+    }
+
+    .overlay-panel h1,
+    .overlay-panel h2 {
+      color: #113754;
+      margin-bottom: 10px;
+      line-height: 1;
+    }
+
+    .overlay-panel h1 {
+      font-size: 38px;
+    }
+
+    .overlay-panel h2 {
+      font-size: 30px;
+    }
+
+    .overlay-panel p {
+      color: #46657c;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .overlay-buttons {
+      display: grid;
+      gap: 10px;
+    }
+
+    .side-card {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+
+    .brand h1 {
+      font-size: 40px;
+      color: #0f3d5f;
+      margin-bottom: 8px;
+      line-height: 1;
+    }
+
+    .brand p {
+      font-size: 15px;
+      line-height: 1.55;
+      color: #385d74;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .stat-box {
+      background: rgba(255, 255, 255, 0.90);
+      border-radius: 20px;
+      padding: 16px;
+      box-shadow: 0 10px 22px rgba(15, 61, 95, 0.10);
+      min-height: 90px;
+    }
+
+    .stat-box small {
+      display: block;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: bold;
+      font-size: 11px;
+      color: #5f7c91;
+      margin-bottom: 6px;
+    }
+
+    .stat-box h3 {
+      font-size: 32px;
+      color: #0f3d5f;
+      line-height: 1.1;
+    }
+
+    .stat-box .subtext {
+      margin-top: 6px;
+      font-size: 13px;
+      color: #567387;
+    }
+
+    .medal-card {
+      background: rgba(255, 255, 255, 0.90);
+      border-radius: 22px;
+      padding: 16px;
+      margin-top: 14px;
+      box-shadow: 0 10px 22px rgba(15, 61, 95, 0.10);
+      text-align: center;
+    }
+
+    .medal-card small {
+      display: block;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: bold;
+      font-size: 11px;
+      color: #5f7c91;
+      margin-bottom: 8px;
+    }
+
+    .medal-badge {
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      margin: 0 auto 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+      color: white;
+      box-shadow: inset 0 0 0 6px rgba(255,255,255,0.25), 0 10px 24px rgba(0,0,0,0.14);
+      text-align: center;
+      padding: 8px;
+    }
+
+    .medal-none { background: linear-gradient(135deg, #94a3b8, #64748b); }
+    .medal-bronze { background: linear-gradient(135deg, #c97a3d, #8b4a18); }
+    .medal-silver { background: linear-gradient(135deg, #dce3ea, #8f9eab); }
+    .medal-gold { background: linear-gradient(135deg, #ffd54d, #e0a800); }
+    .medal-platinum { background: linear-gradient(135deg, #9cf3ff, #2aa6b6); }
+
+    .medal-name {
+      font-size: 20px;
+      font-weight: bold;
+      color: #0f3d5f;
+      margin-bottom: 4px;
+    }
+
+    .medal-desc {
+      font-size: 13px;
+      color: #5b788d;
+      line-height: 1.4;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      color: white;
+      transition: 0.2s ease;
+      box-shadow: 0 10px 20px rgba(15, 61, 95, 0.14);
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+    }
+
+    .btn-start { background: linear-gradient(135deg, #22c55e, #16a34a); }
+    .btn-restart { background: linear-gradient(135deg, #ef4444, #dc2626); }
+    .btn-sound { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+
+    .footer-note {
+      margin-top: 14px;
+      text-align: center;
+      font-size: 12px;
+      color: #5b788d;
+      line-height: 1.4;
+    }
+
+    .overlay-score {
+      font-size: 18px;
+      color: #244b67;
+      margin-bottom: 8px;
+    }
+
+    .overlay-medal {
+      margin: 10px auto 14px;
+    }
+
+    @media (max-width: 900px) {
+      .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: min(860px, calc(100vh - 24px));
+      }
+
+      .side-card {
+        padding: 16px;
+      }
+
+      .brand h1 {
+        font-size: 32px;
+      }
+
+      .brand p {
+        font-size: 13px;
+      }
+
+      .stats {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .stat-box {
+        min-height: auto;
+        padding: 12px;
+      }
+
+      .stat-box h3 {
+        font-size: 24px;
+      }
+
+      .medal-card {
+        padding: 12px;
+      }
+
+      .medal-badge {
+        width: 72px;
+        height: 72px;
+        font-size: 14px;
+      }
+
+      .actions {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 8px;
+      }
+
+      .app {
+        gap: 10px;
+        height: calc(100vh - 16px);
+      }
+
+      .side-card {
+        padding: 12px;
+        gap: 8px;
+      }
+
+      .brand h1 {
+        font-size: 28px;
+      }
+
+      .brand p {
+        font-size: 12px;
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .actions {
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+      }
+
+      button {
+        padding: 12px 10px;
+        font-size: 13px;
+      }
+
+      .footer-note {
+        font-size: 11px;
+        margin-top: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app">
+    <div class="game-card">
+      <div class="stage">
+        <canvas id="gameCanvas" width="430" height="680"></canvas>
+
+        <div class="overlay" id="overlay">
+          <div class="overlay-panel" id="overlayPanel">
+            <h1>Flappy Zoe</h1>
+            <p>Ready to fly?</p>
+
+            <div class="overlay-buttons">
+              <button class="btn-start" id="overlayStartBtn">Start Game</button>
+              <button class="btn-sound" id="overlaySoundBtn">Sound: On</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-card">
+      <div>
+        <div class="brand">
+          <h1>Flappy Zoe</h1>
+          <p>
+            Flappy Zoe is the daughter of Siegried and Ruffa Mae Maghanoy,
+            Zoe born in February 11, 2026
+          </p>
+        </div>
+
+        <div class="stats">
+          <div class="stat-box">
+            <small>Score</small>
+            <h3 id="scoreValue">0</h3>
+            <div class="subtext">Current run</div>
+          </div>
+
+          <div class="stat-box">
+            <small>Best Score</small>
+            <h3 id="bestValue">0</h3>
+            <div class="subtext">Saved on this device</div>
+          </div>
+
+          <div class="stat-box">
+            <small>Speed</small>
+            <h3 id="speedValue">1x</h3>
+            <div class="subtext">Gets faster</div>
+          </div>
+
+          <div class="stat-box">
+            <small>Gap</small>
+            <h3 id="gapValue">170</h3>
+            <div class="subtext">Gets harder</div>
+          </div>
+        </div>
+
+        <div class="medal-card">
+          <small>Current Medal</small>
+          <div class="medal-badge medal-none" id="medalBadge">ZOE</div>
+          <div class="medal-name" id="medalName">Starter</div>
+          <div class="medal-desc" id="medalDesc">Start a run and earn a medal.</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="actions">
+          <button class="btn-start" id="startBtn">Start Game</button>
+          <button class="btn-restart" id="restartBtn">Restart</button>
+          <button class="btn-sound" id="soundBtn">Sound: On</button>
+        </div>
+
+        <div class="footer-note">
+          Tap the game area, click, or press Space while playing.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const scoreValue = document.getElementById("scoreValue");
+    const bestValue = document.getElementById("bestValue");
+    const speedValue = document.getElementById("speedValue");
+    const gapValue = document.getElementById("gapValue");
+
+    const medalBadge = document.getElementById("medalBadge");
+    const medalName = document.getElementById("medalName");
+    const medalDesc = document.getElementById("medalDesc");
+
+    const overlay = document.getElementById("overlay");
+    const overlayPanel = document.getElementById("overlayPanel");
+
+    const startBtn = document.getElementById("startBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const soundBtn = document.getElementById("soundBtn");
+    const overlayStartBtn = document.getElementById("overlayStartBtn");
+    const overlaySoundBtn = document.getElementById("overlaySoundBtn");
+
+    const gameWidth = canvas.width;
+    const gameHeight = canvas.height;
+    const groundHeight = 96;
+
+    let audioCtx = null;
+
+    const zoeImage = new Image();
+
+    /*
+      IMPORTANT:
+      The image is NOT placed inside a box or circle.
+      It is drawn as a free PNG sprite with transparent background.
+
+      To replace the image later:
+      1. Upload a PNG image to your GitHub repository.
+      2. Name it zoe.png.
+      3. Keep this line exactly:
+         zoeImage.src = "./zoe.png?v=10";
+    */
+    zoeImage.src = "zoe.png";
+
+    const state = {
+      mode: "menu",
+      frame: 0,
+      score: 0,
+      best: Number(localStorage.getItem("flappyZoeBest")) || 0,
+      sound: true,
+      clouds: [
+        { x: 50,  y: 90,  size: 0.95, speed: 0.24 },
+        { x: 240, y: 140, size: 1.18, speed: 0.18 },
+        { x: 370, y: 85,  size: 0.76, speed: 0.30 }
+      ],
+      pipes: [],
+      particles: [],
+      lastSpawnFrame: 0
+    };
+
+    const bird = {
+      x: 82,
+      y: 270,
+      width: 92,
+      height: 126,
+      velocity: 0,
+      gravity: 0.42,
+      flap: -7.6,
+      rotation: 0,
+      bobAngle: 0
+    };
+
+    bestValue.textContent = state.best;
+    updateDifficultyReadout();
+    updateMedalUI(0);
+    updateSoundButtons();
+
+    function resetBird() {
+      bird.x = 82;
+      bird.y = 270;
+      bird.velocity = 0;
+      bird.rotation = 0;
+      bird.bobAngle = 0;
+    }
+
+    function resetRun() {
+      state.frame = 0;
+      state.score = 0;
+      state.pipes = [];
+      state.particles = [];
+      state.lastSpawnFrame = 0;
+      resetBird();
+      scoreValue.textContent = state.score;
+      updateDifficultyReadout();
+      updateMedalUI(0);
+    }
+
+    function currentPipeGap() {
+      return Math.max(120, 175 - Math.floor(state.score * 2.1));
+    }
+
+    function currentPipeSpeed() {
+      return Math.min(6.1, 2.75 + state.score * 0.075);
+    }
+
+    function currentSpawnFrames() {
+      return Math.max(74, 104 - Math.floor(state.score * 1.2));
+    }
+
+    function updateDifficultyReadout() {
+      speedValue.textContent = (currentPipeSpeed() / 2.75).toFixed(1) + "x";
+      gapValue.textContent = currentPipeGap();
+    }
+
+    function getMedal(score) {
+      if (score >= 25) {
+        return {
+          className: "medal-platinum",
+          short: "PLAT",
+          name: "Platinum",
+          desc: "Amazing flight. Zoe is a sky legend."
+        };
+      }
+
+      if (score >= 15) {
+        return {
+          className: "medal-gold",
+          short: "GOLD",
+          name: "Gold",
+          desc: "Excellent run. Zoe is flying beautifully."
+        };
+      }
+
+      if (score >= 8) {
+        return {
+          className: "medal-silver",
+          short: "SILV",
+          name: "Silver",
+          desc: "Great job. Zoe is getting stronger."
+        };
+      }
+
+      if (score >= 3) {
+        return {
+          className: "medal-bronze",
+          short: "BRNZ",
+          name: "Bronze",
+          desc: "Nice start. Zoe earned her first medal."
+        };
+      }
+
+      return {
+        className: "medal-none",
+        short: "ZOE",
+        name: "Starter",
+        desc: "Start a run and earn a medal."
+      };
+    }
+
+    function updateMedalUI(score) {
+      const medal = getMedal(score);
+      medalBadge.className = "medal-badge " + medal.className;
+      medalBadge.textContent = medal.short;
+      medalName.textContent = medal.name;
+      medalDesc.textContent = medal.desc;
+    }
+
+    function ensureAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+    }
+
+    function beep(freq, duration, type, volume, slideTo) {
+      if (!state.sound) return;
+      ensureAudio();
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const now = audioCtx.currentTime;
+
+      osc.type = type || "sine";
+      osc.frequency.setValueAtTime(freq, now);
+
+      if (slideTo) {
+        osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
+      }
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(volume || 0.05, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    }
+
+    function playFlapSound() {
+      beep(620, 0.08, "triangle", 0.04, 440);
+    }
+
+    function playPointSound() {
+      beep(880, 0.07, "square", 0.04, 1080);
+      setTimeout(() => beep(1180, 0.07, "square", 0.035, 1320), 60);
+    }
+
+    function playHitSound() {
+      beep(180, 0.18, "sawtooth", 0.06, 90);
+    }
+
+    function playStartSound() {
+      beep(480, 0.07, "triangle", 0.04, 620);
+      setTimeout(() => beep(720, 0.07, "triangle", 0.035, 840), 60);
+    }
+
+    function updateSoundButtons() {
+      soundBtn.textContent = "Sound: " + (state.sound ? "On" : "Off");
+      overlaySoundBtn.textContent = "Sound: " + (state.sound ? "On" : "Off");
+    }
+
+    function setOverlayMenu() {
+      overlay.classList.remove("hidden");
+      overlayPanel.innerHTML = `
+        <h1>Flappy Zoe</h1>
+        <p>Tap Start Game and let Zoe fly.</p>
+        <div class="overlay-buttons">
+          <button class="btn-start" id="overlayStartBtnInner">Start Game</button>
+          <button class="btn-sound" id="overlaySoundBtnInner">Sound: ${state.sound ? "On" : "Off"}</button>
+        </div>
+      `;
+
+      document.getElementById("overlayStartBtnInner").addEventListener("click", startGame);
+      document.getElementById("overlaySoundBtnInner").addEventListener("click", toggleSound);
+    }
+
+    function setOverlayGameOver() {
+      const medal = getMedal(state.score);
+
+      overlay.classList.remove("hidden");
+      overlayPanel.innerHTML = `
+        <h2>Game Over</h2>
+        <div class="overlay-score">Score: ${state.score}</div>
+        <div class="overlay-score">Best: ${state.best}</div>
+        <div class="medal-badge ${medal.className} overlay-medal">${medal.short}</div>
+        <p>${medal.name} Medal<br>${medal.desc}</p>
+        <div class="overlay-buttons">
+          <button class="btn-start" id="overlayRestartBtnInner">Play Again</button>
+          <button class="btn-sound" id="overlaySoundBtnInner">Sound: ${state.sound ? "On" : "Off"}</button>
+        </div>
+      `;
+
+      document.getElementById("overlayRestartBtnInner").addEventListener("click", restartGame);
+      document.getElementById("overlaySoundBtnInner").addEventListener("click", toggleSound);
+    }
+
+    function hideOverlay() {
+      overlay.classList.add("hidden");
+    }
+
+    function startGame() {
+      ensureAudio();
+      resetRun();
+      state.mode = "playing";
+      hideOverlay();
+      bird.velocity = bird.flap;
+      playStartSound();
+    }
+
+    function restartGame() {
+      ensureAudio();
+      resetRun();
+      state.mode = "playing";
+      hideOverlay();
+      bird.velocity = bird.flap;
+      playStartSound();
+    }
+
+    function toggleSound() {
+      state.sound = !state.sound;
+      updateSoundButtons();
+
+      if (overlay && !overlay.classList.contains("hidden")) {
+        if (state.mode === "menu") setOverlayMenu();
+        if (state.mode === "gameover") setOverlayGameOver();
+      }
+    }
+
+    function flapAction() {
+      ensureAudio();
+
+      if (state.mode === "menu") {
+        startGame();
+        return;
+      }
+
+      if (state.mode === "gameover") {
+        restartGame();
+        return;
+      }
+
+      if (state.mode !== "playing") return;
+
+      bird.velocity = bird.flap;
+      bird.rotation = -0.34;
+      playFlapSound();
+    }
+
+    function addPipe() {
+      const gap = currentPipeGap();
+      const minTop = 70;
+      const maxTop = gameHeight - groundHeight - gap - 80;
+      const topHeight = Math.floor(Math.random() * (maxTop - minTop + 1)) + minTop;
+
+      state.pipes.push({
+        x: gameWidth + 28,
+        top: topHeight,
+        gap: gap,
+        passed: false
+      });
+    }
+
+    function addSpark(x, y, color) {
+      for (let i = 0; i < 7; i++) {
+        state.particles.push({
+          x: x,
+          y: y,
+          vx: (Math.random() - 0.5) * 2.6,
+          vy: (Math.random() - 0.8) * 2.2,
+          life: 26 + Math.random() * 18,
+          radius: 1.8 + Math.random() * 2.4,
+          color: color
+        });
+      }
+    }
+
+    function updateClouds() {
+      state.clouds.forEach(cloud => {
+        cloud.x -= cloud.speed;
+        if (cloud.x < -120) {
+          cloud.x = gameWidth + 80;
+          cloud.y = 70 + Math.random() * 120;
+        }
+      });
+    }
+
+    function updateParticles() {
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const p = state.particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 1;
+        p.vy += 0.02;
+
+        if (p.life <= 0) {
+          state.particles.splice(i, 1);
+        }
+      }
+    }
+
+    function updateGame() {
+      updateClouds();
+      updateParticles();
+
+      if (state.mode === "menu") {
+        bird.bobAngle += 0.06;
+        bird.y = 265 + Math.sin(bird.bobAngle) * 8;
+        bird.rotation = Math.sin(bird.bobAngle) * 0.035;
+        return;
+      }
+
+      if (state.mode !== "playing") return;
+
+      state.frame += 1;
+
+      bird.velocity += bird.gravity;
+      bird.y += bird.velocity;
+
+      if (bird.velocity < 0) {
+        bird.rotation = -0.28;
+      } else {
+        bird.rotation = Math.min(0.75, bird.rotation + 0.032);
+      }
+
+      const spawnEvery = currentSpawnFrames();
+      if (state.frame - state.lastSpawnFrame >= spawnEvery) {
+        addPipe();
+        state.lastSpawnFrame = state.frame;
+      }
+
+      const pipeSpeed = currentPipeSpeed();
+
+      for (let i = state.pipes.length - 1; i >= 0; i--) {
+        const pipe = state.pipes[i];
+        pipe.x -= pipeSpeed;
+
+        if (!pipe.passed && pipe.x + 82 < bird.x) {
+          pipe.passed = true;
+          state.score += 1;
+          scoreValue.textContent = state.score;
+          updateDifficultyReadout();
+          updateMedalUI(state.score);
+          playPointSound();
+          addSpark(bird.x + bird.width, bird.y + 12, "#fff7b2");
+
+          if (state.score > state.best) {
+            state.best = state.score;
+            bestValue.textContent = state.best;
+            localStorage.setItem("flappyZoeBest", state.best);
+          }
+        }
+
+        if (pipe.x < -110) {
+          state.pipes.splice(i, 1);
+        }
+      }
+
+      if (bird.y <= -10) {
+        bird.y = -10;
+        endRun();
+      }
+
+      if (bird.y + bird.height >= gameHeight - groundHeight) {
+        bird.y = gameHeight - groundHeight - bird.height;
+        endRun();
+      }
+
+      checkPipeCollision();
+    }
+
+    function checkPipeCollision() {
+      const bx = bird.x + bird.width * 0.50;
+      const by = bird.y + bird.height * 0.50;
+      const rx = bird.width * 0.30;
+      const ry = bird.height * 0.38;
+
+      for (const pipe of state.pipes) {
+        const pipeWidth = 82;
+        const gapStart = pipe.top;
+        const gapEnd = pipe.top + pipe.gap;
+
+        const inX = bx + rx > pipe.x && bx - rx < pipe.x + pipeWidth;
+        const hitTop = by - ry < gapStart;
+        const hitBottom = by + ry > gapEnd;
+
+        if (inX && (hitTop || hitBottom)) {
+          endRun();
+          return;
+        }
+      }
+    }
+
+    function endRun() {
+      if (state.mode !== "playing") return;
+
+      state.mode = "gameover";
+      playHitSound();
+      updateMedalUI(state.score);
+      setOverlayGameOver();
+    }
+
+    function drawBackground() {
+      const grad = ctx.createLinearGradient(0, 0, 0, gameHeight);
+      grad.addColorStop(0, "#7fd4ff");
+      grad.addColorStop(1, "#ecfdff");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, gameWidth, gameHeight);
+
+      drawSun();
+      drawCloudLayer();
+
+      ctx.fillStyle = "rgba(184, 236, 255, 0.75)";
+      ctx.beginPath();
+      ctx.ellipse(105, gameHeight - 145, 165, 48, 0, 0, Math.PI * 2);
+      ctx.ellipse(300, gameHeight - 150, 170, 56, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawSun() {
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = "#fff7b8";
+      ctx.beginPath();
+      ctx.arc(72, 72, 34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawCloud(x, y, scale) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = "rgba(255,255,255,0.90)";
+
+      ctx.beginPath();
+      ctx.arc(0, 0, 20, 0, Math.PI * 2);
+      ctx.arc(24, -12, 24, 0, Math.PI * 2);
+      ctx.arc(54, 0, 19, 0, Math.PI * 2);
+      ctx.arc(26, 12, 23, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawCloudLayer() {
+      state.clouds.forEach(cloud => drawCloud(cloud.x, cloud.y, cloud.size));
+    }
+
+    function drawSinglePipe(x, y, width, height, isTop) {
+      const grad = ctx.createLinearGradient(x, 0, x + width, 0);
+      grad.addColorStop(0, "#22c55e");
+      grad.addColorStop(1, "#15803d");
+
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, y, width, height);
+
+      ctx.strokeStyle = "#14532d";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x, y, width, height);
+
+      ctx.fillStyle = "rgba(255,255,255,0.22)";
+      ctx.fillRect(x + 8, y + 8, 10, Math.max(18, height - 16));
+
+      const capHeight = 18;
+      const capWidth = width + 12;
+      const capX = x - 6;
+      const capY = isTop ? y + height - capHeight : y;
+
+      ctx.fillStyle = "#16a34a";
+      ctx.fillRect(capX, capY, capWidth, capHeight);
+      ctx.strokeRect(capX, capY, capWidth, capHeight);
+    }
+
+    function drawPipes() {
+      const pipeWidth = 82;
+
+      state.pipes.forEach(pipe => {
+        drawSinglePipe(pipe.x, 0, pipeWidth, pipe.top, true);
+
+        const bottomY = pipe.top + pipe.gap;
+        drawSinglePipe(
+          pipe.x,
+          bottomY,
+          pipeWidth,
+          gameHeight - groundHeight - bottomY,
+          false
+        );
+      });
+    }
+
+    function drawGround() {
+      ctx.fillStyle = "#f5d76e";
+      ctx.fillRect(0, gameHeight - groundHeight, gameWidth, groundHeight);
+
+      ctx.fillStyle = "#77c43b";
+      ctx.fillRect(0, gameHeight - groundHeight, gameWidth, 16);
+
+      for (let i = 0; i < gameWidth; i += 24) {
+        ctx.fillStyle = i % 48 === 0 ? "#e0aa2d" : "#f3bc3c";
+        ctx.fillRect(i, gameHeight - 42, 24, 12);
+      }
+    }
+
+    function drawParticles() {
+      state.particles.forEach(p => {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.life / 40);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+
+    function drawBird() {
+      const x = bird.x;
+      const y = bird.y;
+      const w = bird.width;
+      const h = bird.height;
+
+      ctx.save();
+      ctx.translate(x + w / 2, y + h / 2);
+      ctx.rotate(bird.rotation);
+
+      ctx.shadowColor = "rgba(255,255,255,0.70)";
+      ctx.shadowBlur = 14;
+
+      if (zoeImage.complete && zoeImage.naturalWidth > 0) {
+        ctx.drawImage(zoeImage, -w / 2, -h / 2, w, h);
+      } else {
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 20px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("ZOE", 0, 0);
+      }
+
+      ctx.restore();
+    }
+
+    function drawScore() {
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.font = "bold 36px Arial";
+      ctx.fillStyle = "rgba(255,255,255,0.94)";
+      ctx.strokeStyle = "rgba(18,55,84,0.28)";
+      ctx.lineWidth = 4;
+      ctx.strokeText(state.score, gameWidth / 2, 64);
+      ctx.fillText(state.score, gameWidth / 2, 64);
+      ctx.restore();
+    }
+
+    function render() {
+      drawBackground();
+      drawPipes();
+      drawGround();
+      drawParticles();
+      drawBird();
+      drawScore();
+    }
+
+    function loop() {
+      updateGame();
+      render();
+      requestAnimationFrame(loop);
+    }
+
+    function canvasInput(e) {
+      e.preventDefault();
+      flapAction();
+    }
+
+    startBtn.addEventListener("click", startGame);
+    restartBtn.addEventListener("click", restartGame);
+    soundBtn.addEventListener("click", toggleSound);
+    overlayStartBtn.addEventListener("click", startGame);
+    overlaySoundBtn.addEventListener("click", toggleSound);
+
+    canvas.addEventListener("click", canvasInput);
+    canvas.addEventListener("touchstart", canvasInput, { passive: false });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.code === "Space" || e.code === "ArrowUp") {
+        e.preventDefault();
+        flapAction();
+      }
+    });
+
+    setOverlayMenu();
+    render();
+    loop();
+  </script>
+
+</body>
+</html>
