@@ -72,7 +72,7 @@
       width: 100%;
       height: 100%;
       cursor: pointer;
-      background: linear-gradient(180deg, #7fd4ff 0%, #e8fbff 100%);
+      background: transparent;
     }
 
     .overlay {
@@ -267,6 +267,7 @@
     .btn-start { background: linear-gradient(135deg, #22c55e, #16a34a); }
     .btn-restart { background: linear-gradient(135deg, #ef4444, #dc2626); }
     .btn-sound { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+    .btn-music { background: linear-gradient(135deg, #a855f7, #7e22ce); }
 
     .footer-note {
       margin-top: 14px;
@@ -329,7 +330,7 @@
       }
 
       .actions {
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
       }
     }
 
@@ -363,7 +364,7 @@
       }
 
       .actions {
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: 1fr 1fr;
         gap: 8px;
       }
 
@@ -379,6 +380,7 @@
     }
   </style>
 </head>
+
 <body>
 
   <div class="app">
@@ -430,9 +432,9 @@
           </div>
 
           <div class="stat-box">
-            <small>Gap</small>
-            <h3 id="gapValue">170</h3>
-            <div class="subtext">Gets harder</div>
+            <small>Mode</small>
+            <h3 id="modeValue">Day</h3>
+            <div class="subtext">Every 10 pipes</div>
           </div>
         </div>
 
@@ -446,9 +448,10 @@
 
       <div>
         <div class="actions">
-          <button class="btn-start" id="startBtn">Start Game</button>
+          <button class="btn-start" id="startBtn">Start</button>
           <button class="btn-restart" id="restartBtn">Restart</button>
           <button class="btn-sound" id="soundBtn">Sound: On</button>
+          <button class="btn-music" id="musicBtn">Music: On</button>
         </div>
 
         <div class="footer-note">
@@ -465,7 +468,7 @@
     const scoreValue = document.getElementById("scoreValue");
     const bestValue = document.getElementById("bestValue");
     const speedValue = document.getElementById("speedValue");
-    const gapValue = document.getElementById("gapValue");
+    const modeValue = document.getElementById("modeValue");
 
     const medalBadge = document.getElementById("medalBadge");
     const medalName = document.getElementById("medalName");
@@ -477,6 +480,7 @@
     const startBtn = document.getElementById("startBtn");
     const restartBtn = document.getElementById("restartBtn");
     const soundBtn = document.getElementById("soundBtn");
+    const musicBtn = document.getElementById("musicBtn");
     const overlayStartBtn = document.getElementById("overlayStartBtn");
     const overlaySoundBtn = document.getElementById("overlaySoundBtn");
 
@@ -485,21 +489,11 @@
     const groundHeight = 96;
 
     let audioCtx = null;
+    let musicTimer = null;
+    let musicStep = 0;
 
     const zoeImage = new Image();
-
-    /*
-      IMPORTANT:
-      The image is NOT placed inside a box or circle.
-      It is drawn as a free PNG sprite with transparent background.
-
-      To replace the image later:
-      1. Upload a PNG image to your GitHub repository.
-      2. Name it zoe.png.
-      3. Keep this line exactly:
-         zoeImage.src = "./zoe.png?v=10";
-    */
-    zoeImage.src = "zoe.png";
+    zoeImage.src = "./zoe.png?v=12";
 
     const state = {
       mode: "menu",
@@ -507,24 +501,38 @@
       score: 0,
       best: Number(localStorage.getItem("flappyZoeBest")) || 0,
       sound: true,
+      music: true,
+      themeAmount: 0,
       clouds: [
         { x: 50,  y: 90,  size: 0.95, speed: 0.24 },
         { x: 240, y: 140, size: 1.18, speed: 0.18 },
-        { x: 370, y: 85,  size: 0.76, speed: 0.30 }
+        { x: 370, y: 85,  size: 0.76, speed: 0.30 },
+        { x: 145, y: 210, size: 0.70, speed: 0.16 }
       ],
+      stars: [],
       pipes: [],
       particles: [],
       lastSpawnFrame: 0
     };
 
+    for (let i = 0; i < 60; i++) {
+      state.stars.push({
+        x: Math.random() * gameWidth,
+        y: Math.random() * (gameHeight - groundHeight - 35),
+        size: Math.random() * 2.1 + 0.8,
+        twinkle: Math.random() * Math.PI * 2,
+        speed: Math.random() * 0.08 + 0.02
+      });
+    }
+
     const bird = {
-      x: 82,
-      y: 270,
-      width: 92,
-      height: 126,
+      x: 88,
+      y: 275,
+      width: 48,
+      height: 68,
       velocity: 0,
       gravity: 0.42,
-      flap: -7.6,
+      flap: -7.4,
       rotation: 0,
       bobAngle: 0
     };
@@ -533,10 +541,11 @@
     updateDifficultyReadout();
     updateMedalUI(0);
     updateSoundButtons();
+    updateModeReadout();
 
     function resetBird() {
-      bird.x = 82;
-      bird.y = 270;
+      bird.x = 88;
+      bird.y = 275;
       bird.velocity = 0;
       bird.rotation = 0;
       bird.bobAngle = 0;
@@ -552,23 +561,31 @@
       scoreValue.textContent = state.score;
       updateDifficultyReadout();
       updateMedalUI(0);
+      updateModeReadout();
+    }
+
+    function isNightMode() {
+      return Math.floor(state.score / 10) % 2 === 1;
     }
 
     function currentPipeGap() {
-      return Math.max(120, 175 - Math.floor(state.score * 2.1));
+      return Math.max(128, 182 - Math.floor(state.score * 1.65));
     }
 
     function currentPipeSpeed() {
-      return Math.min(6.1, 2.75 + state.score * 0.075);
+      return Math.min(6.0, 2.75 + state.score * 0.065);
     }
 
     function currentSpawnFrames() {
-      return Math.max(74, 104 - Math.floor(state.score * 1.2));
+      return Math.max(76, 106 - Math.floor(state.score * 1.05));
     }
 
     function updateDifficultyReadout() {
       speedValue.textContent = (currentPipeSpeed() / 2.75).toFixed(1) + "x";
-      gapValue.textContent = currentPipeGap();
+    }
+
+    function updateModeReadout() {
+      modeValue.textContent = isNightMode() ? "Night" : "Day";
     }
 
     function getMedal(score) {
@@ -678,9 +695,39 @@
       setTimeout(() => beep(720, 0.07, "triangle", 0.035, 840), 60);
     }
 
+    function startMusic() {
+      if (!state.music || musicTimer) return;
+
+      ensureAudio();
+
+      const melody = isNightMode()
+        ? [392, 440, 494, 440, 392, 330, 392, 330]
+        : [523, 659, 784, 659, 698, 784, 659, 523];
+
+      musicTimer = setInterval(() => {
+        if (state.mode !== "playing" || !state.music || !state.sound) return;
+
+        const notes = isNightMode()
+          ? [392, 440, 494, 440, 392, 330, 392, 330]
+          : [523, 659, 784, 659, 698, 784, 659, 523];
+
+        const note = notes[musicStep % notes.length];
+        beep(note, 0.13, "sine", 0.015);
+        musicStep++;
+      }, 430);
+    }
+
+    function stopMusic() {
+      if (musicTimer) {
+        clearInterval(musicTimer);
+        musicTimer = null;
+      }
+    }
+
     function updateSoundButtons() {
       soundBtn.textContent = "Sound: " + (state.sound ? "On" : "Off");
       overlaySoundBtn.textContent = "Sound: " + (state.sound ? "On" : "Off");
+      musicBtn.textContent = "Music: " + (state.music ? "On" : "Off");
     }
 
     function setOverlayMenu() {
@@ -729,6 +776,7 @@
       hideOverlay();
       bird.velocity = bird.flap;
       playStartSound();
+      startMusic();
     }
 
     function restartGame() {
@@ -738,15 +786,33 @@
       hideOverlay();
       bird.velocity = bird.flap;
       playStartSound();
+      startMusic();
     }
 
     function toggleSound() {
       state.sound = !state.sound;
       updateSoundButtons();
 
+      if (!state.sound) {
+        stopMusic();
+      } else if (state.mode === "playing") {
+        startMusic();
+      }
+
       if (overlay && !overlay.classList.contains("hidden")) {
         if (state.mode === "menu") setOverlayMenu();
         if (state.mode === "gameover") setOverlayGameOver();
+      }
+    }
+
+    function toggleMusic() {
+      state.music = !state.music;
+      updateSoundButtons();
+
+      if (state.music && state.sound && state.mode === "playing") {
+        startMusic();
+      } else {
+        stopMusic();
       }
     }
 
@@ -766,14 +832,14 @@
       if (state.mode !== "playing") return;
 
       bird.velocity = bird.flap;
-      bird.rotation = -0.34;
+      bird.rotation = -0.30;
       playFlapSound();
     }
 
     function addPipe() {
       const gap = currentPipeGap();
-      const minTop = 70;
-      const maxTop = gameHeight - groundHeight - gap - 80;
+      const minTop = 72;
+      const maxTop = gameHeight - groundHeight - gap - 82;
       const topHeight = Math.floor(Math.random() * (maxTop - minTop + 1)) + minTop;
 
       state.pipes.push({
@@ -798,12 +864,29 @@
       }
     }
 
+    function updateTheme() {
+      const target = isNightMode() ? 1 : 0;
+      state.themeAmount += (target - state.themeAmount) * 0.035;
+    }
+
     function updateClouds() {
       state.clouds.forEach(cloud => {
         cloud.x -= cloud.speed;
         if (cloud.x < -120) {
           cloud.x = gameWidth + 80;
-          cloud.y = 70 + Math.random() * 120;
+          cloud.y = 70 + Math.random() * 150;
+        }
+      });
+    }
+
+    function updateStars() {
+      state.stars.forEach(star => {
+        star.twinkle += 0.035;
+        star.x -= star.speed;
+
+        if (star.x < -5) {
+          star.x = gameWidth + 5;
+          star.y = Math.random() * (gameHeight - groundHeight - 35);
         }
       });
     }
@@ -823,13 +906,15 @@
     }
 
     function updateGame() {
+      updateTheme();
       updateClouds();
+      updateStars();
       updateParticles();
 
       if (state.mode === "menu") {
         bird.bobAngle += 0.06;
-        bird.y = 265 + Math.sin(bird.bobAngle) * 8;
-        bird.rotation = Math.sin(bird.bobAngle) * 0.035;
+        bird.y = 275 + Math.sin(bird.bobAngle) * 8;
+        bird.rotation = Math.sin(bird.bobAngle) * 0.03;
         return;
       }
 
@@ -841,9 +926,9 @@
       bird.y += bird.velocity;
 
       if (bird.velocity < 0) {
-        bird.rotation = -0.28;
+        bird.rotation = -0.25;
       } else {
-        bird.rotation = Math.min(0.75, bird.rotation + 0.032);
+        bird.rotation = Math.min(0.70, bird.rotation + 0.030);
       }
 
       const spawnEvery = currentSpawnFrames();
@@ -864,8 +949,9 @@
           scoreValue.textContent = state.score;
           updateDifficultyReadout();
           updateMedalUI(state.score);
+          updateModeReadout();
           playPointSound();
-          addSpark(bird.x + bird.width, bird.y + 12, "#fff7b2");
+          addSpark(bird.x + bird.width, bird.y + 12, isNightMode() ? "#c7f1ff" : "#fff7b2");
 
           if (state.score > state.best) {
             state.best = state.score;
@@ -895,8 +981,8 @@
     function checkPipeCollision() {
       const bx = bird.x + bird.width * 0.50;
       const by = bird.y + bird.height * 0.50;
-      const rx = bird.width * 0.30;
-      const ry = bird.height * 0.38;
+      const rx = bird.width * 0.22;
+      const ry = bird.height * 0.28;
 
       for (const pipe of state.pipes) {
         const pipeWidth = 82;
@@ -918,31 +1004,48 @@
       if (state.mode !== "playing") return;
 
       state.mode = "gameover";
+      stopMusic();
       playHitSound();
       updateMedalUI(state.score);
       setOverlayGameOver();
     }
 
     function drawBackground() {
-      const grad = ctx.createLinearGradient(0, 0, 0, gameHeight);
-      grad.addColorStop(0, "#7fd4ff");
-      grad.addColorStop(1, "#ecfdff");
-      ctx.fillStyle = grad;
+      const night = state.themeAmount;
+
+      const dayGrad = ctx.createLinearGradient(0, 0, 0, gameHeight);
+      dayGrad.addColorStop(0, "#7fd4ff");
+      dayGrad.addColorStop(1, "#ecfdff");
+      ctx.fillStyle = dayGrad;
       ctx.fillRect(0, 0, gameWidth, gameHeight);
 
-      drawSun();
-      drawCloudLayer();
+      if (night > 0.01) {
+        const nightGrad = ctx.createLinearGradient(0, 0, 0, gameHeight);
+        nightGrad.addColorStop(0, "#0f1d3d");
+        nightGrad.addColorStop(1, "#1c315f");
+        ctx.globalAlpha = night;
+        ctx.fillStyle = nightGrad;
+        ctx.fillRect(0, 0, gameWidth, gameHeight);
+        ctx.globalAlpha = 1;
+      }
 
-      ctx.fillStyle = "rgba(184, 236, 255, 0.75)";
+      drawSun(1 - night);
+      drawMoon(night);
+      drawStars(night);
+      drawCloudLayer(night);
+
+      ctx.fillStyle = `rgba(${184 - night * 130}, ${236 - night * 150}, ${255 - night * 70}, 0.75)`;
       ctx.beginPath();
       ctx.ellipse(105, gameHeight - 145, 165, 48, 0, 0, Math.PI * 2);
       ctx.ellipse(300, gameHeight - 150, 170, 56, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    function drawSun() {
+    function drawSun(alpha) {
+      if (alpha <= 0.01) return;
+
       ctx.save();
-      ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = 0.5 * alpha;
       ctx.fillStyle = "#fff7b8";
       ctx.beginPath();
       ctx.arc(72, 72, 34, 0, Math.PI * 2);
@@ -950,11 +1053,67 @@
       ctx.restore();
     }
 
-    function drawCloud(x, y, scale) {
+    function drawMoon(alpha) {
+      if (alpha <= 0.01) return;
+
+      const floatY = Math.sin(state.frame * 0.015) * 4;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = "#f4f4ff";
+      ctx.beginPath();
+      ctx.arc(78, 74 + floatY, 28, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.beginPath();
+      ctx.arc(91, 64 + floatY, 24, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = alpha * 0.25;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(78, 74 + floatY, 36, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawStars(alpha) {
+      if (alpha <= 0.01) return;
+
+      state.stars.forEach(star => {
+        const twinkle = 0.35 + (Math.sin(star.twinkle) + 1) * 0.25;
+
+        ctx.save();
+        ctx.globalAlpha = alpha * twinkle;
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalAlpha = alpha * twinkle * 0.45;
+        ctx.strokeStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.moveTo(star.x - star.size * 2, star.y);
+        ctx.lineTo(star.x + star.size * 2, star.y);
+        ctx.moveTo(star.x, star.y - star.size * 2);
+        ctx.lineTo(star.x, star.y + star.size * 2);
+        ctx.stroke();
+
+        ctx.restore();
+      });
+    }
+
+    function drawCloud(x, y, scale, night) {
       ctx.save();
       ctx.translate(x, y);
       ctx.scale(scale, scale);
-      ctx.fillStyle = "rgba(255,255,255,0.90)";
+      ctx.fillStyle = night > 0.5
+        ? "rgba(214,225,255,0.55)"
+        : "rgba(255,255,255,0.90)";
 
       ctx.beginPath();
       ctx.arc(0, 0, 20, 0, Math.PI * 2);
@@ -965,23 +1124,32 @@
       ctx.restore();
     }
 
-    function drawCloudLayer() {
-      state.clouds.forEach(cloud => drawCloud(cloud.x, cloud.y, cloud.size));
+    function drawCloudLayer(night) {
+      state.clouds.forEach(cloud => drawCloud(cloud.x, cloud.y, cloud.size, night));
     }
 
     function drawSinglePipe(x, y, width, height, isTop) {
+      const night = state.themeAmount;
       const grad = ctx.createLinearGradient(x, 0, x + width, 0);
-      grad.addColorStop(0, "#22c55e");
-      grad.addColorStop(1, "#15803d");
+
+      if (night > 0.5) {
+        grad.addColorStop(0, "#3ec47a");
+        grad.addColorStop(0.55, "#1d7e4f");
+        grad.addColorStop(1, "#115c3a");
+      } else {
+        grad.addColorStop(0, "#22c55e");
+        grad.addColorStop(0.55, "#16a34a");
+        grad.addColorStop(1, "#15803d");
+      }
 
       ctx.fillStyle = grad;
       ctx.fillRect(x, y, width, height);
 
-      ctx.strokeStyle = "#14532d";
+      ctx.strokeStyle = night > 0.5 ? "#0f3726" : "#14532d";
       ctx.lineWidth = 3;
       ctx.strokeRect(x, y, width, height);
 
-      ctx.fillStyle = "rgba(255,255,255,0.22)";
+      ctx.fillStyle = night > 0.5 ? "rgba(200,255,220,0.14)" : "rgba(255,255,255,0.22)";
       ctx.fillRect(x + 8, y + 8, 10, Math.max(18, height - 16));
 
       const capHeight = 18;
@@ -989,9 +1157,21 @@
       const capX = x - 6;
       const capY = isTop ? y + height - capHeight : y;
 
-      ctx.fillStyle = "#16a34a";
+      ctx.fillStyle = night > 0.5 ? "#23935e" : "#16a34a";
       ctx.fillRect(capX, capY, capWidth, capHeight);
       ctx.strokeRect(capX, capY, capWidth, capHeight);
+
+      if (night > 0.5) {
+        ctx.save();
+        ctx.globalAlpha = 0.25;
+        ctx.strokeStyle = "#bfffe0";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + width - 12, y + 8);
+        ctx.lineTo(x + width - 12, y + height - 8);
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     function drawPipes() {
@@ -1012,14 +1192,21 @@
     }
 
     function drawGround() {
-      ctx.fillStyle = "#f5d76e";
+      const night = state.themeAmount;
+
+      ctx.fillStyle = night > 0.5 ? "#6d5e42" : "#f5d76e";
       ctx.fillRect(0, gameHeight - groundHeight, gameWidth, groundHeight);
 
-      ctx.fillStyle = "#77c43b";
+      ctx.fillStyle = night > 0.5 ? "#588d31" : "#77c43b";
       ctx.fillRect(0, gameHeight - groundHeight, gameWidth, 16);
 
       for (let i = 0; i < gameWidth; i += 24) {
-        ctx.fillStyle = i % 48 === 0 ? "#e0aa2d" : "#f3bc3c";
+        if (night > 0.5) {
+          ctx.fillStyle = i % 48 === 0 ? "#8e7340" : "#a6864c";
+        } else {
+          ctx.fillStyle = i % 48 === 0 ? "#e0aa2d" : "#f3bc3c";
+        }
+
         ctx.fillRect(i, gameHeight - 42, 24, 12);
       }
     }
@@ -1046,14 +1233,16 @@
       ctx.translate(x + w / 2, y + h / 2);
       ctx.rotate(bird.rotation);
 
-      ctx.shadowColor = "rgba(255,255,255,0.70)";
-      ctx.shadowBlur = 14;
+      ctx.shadowColor = state.themeAmount > 0.5
+        ? "rgba(255,255,255,0.35)"
+        : "rgba(255,255,255,0.55)";
+      ctx.shadowBlur = 10;
 
       if (zoeImage.complete && zoeImage.naturalWidth > 0) {
         ctx.drawImage(zoeImage, -w / 2, -h / 2, w, h);
       } else {
         ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 20px Arial";
+        ctx.font = "bold 18px Arial";
         ctx.textAlign = "center";
         ctx.fillText("ZOE", 0, 0);
       }
@@ -1065,8 +1254,10 @@
       ctx.save();
       ctx.textAlign = "center";
       ctx.font = "bold 36px Arial";
-      ctx.fillStyle = "rgba(255,255,255,0.94)";
-      ctx.strokeStyle = "rgba(18,55,84,0.28)";
+      ctx.fillStyle = "rgba(255,255,255,0.96)";
+      ctx.strokeStyle = state.themeAmount > 0.5
+        ? "rgba(0,0,0,0.42)"
+        : "rgba(18,55,84,0.28)";
       ctx.lineWidth = 4;
       ctx.strokeText(state.score, gameWidth / 2, 64);
       ctx.fillText(state.score, gameWidth / 2, 64);
@@ -1096,6 +1287,7 @@
     startBtn.addEventListener("click", startGame);
     restartBtn.addEventListener("click", restartGame);
     soundBtn.addEventListener("click", toggleSound);
+    musicBtn.addEventListener("click", toggleMusic);
     overlayStartBtn.addEventListener("click", startGame);
     overlaySoundBtn.addEventListener("click", toggleSound);
 
